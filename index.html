@@ -4,9 +4,424 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>MyWorld - Your Personal 3D Navigation Simulation</title>
-    <link rel="stylesheet" href="styles.css">
+    <!-- Three.js -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-    <script defer src="https://maps.googleapis.com/maps/api/js?key=YOUR_API_KEY&libraries=places&callback=initGoogleMaps"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    
+    <!-- Leaflet (OpenStreetMap) -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
+    
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        body {
+            overflow: hidden;
+            background-color: #0a192f;
+            color: white;
+        }
+
+        #container {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+        }
+
+        #scene-container {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            z-index: 1;
+        }
+
+        #ui-container {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            z-index: 2;
+            pointer-events: none;
+        }
+
+        .panel {
+            background-color: rgba(10, 25, 47, 0.85);
+            border-radius: 8px;
+            padding: 15px;
+            backdrop-filter: blur(5px);
+            pointer-events: auto;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+            border: 1px solid rgba(100, 255, 218, 0.3);
+        }
+
+        #top-panel {
+            position: absolute;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 80%;
+            max-width: 800px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .logo {
+            font-size: 24px;
+            font-weight: bold;
+            color: #64ffda;
+            margin-bottom: 10px;
+            text-align: center;
+        }
+
+        .search-container {
+            display: flex;
+            gap: 10px;
+        }
+
+        input {
+            flex: 1;
+            padding: 10px 15px;
+            border-radius: 4px;
+            border: 1px solid rgba(100, 255, 218, 0.5);
+            background-color: rgba(10, 25, 47, 0.7);
+            color: white;
+            font-size: 16px;
+        }
+
+        input::placeholder {
+            color: rgba(255, 255, 255, 0.6);
+        }
+
+        button {
+            padding: 10px 20px;
+            border-radius: 4px;
+            border: none;
+            background-color: #64ffda;
+            color: #0a192f;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        button:hover {
+            background-color: #4cd2ac;
+            transform: translateY(-2px);
+        }
+
+        #side-panel {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            width: 240px;
+        }
+
+        .avatar-selection {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 15px;
+        }
+
+        .avatar-option {
+            text-align: center;
+            padding: 8px;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            width: 70px;
+        }
+
+        .avatar-option:hover {
+            background-color: rgba(100, 255, 218, 0.2);
+        }
+
+        .avatar-option.active {
+            background-color: rgba(100, 255, 218, 0.3);
+            border: 1px solid #64ffda;
+        }
+
+        .avatar-icon {
+            font-size: 24px;
+            margin-bottom: 5px;
+        }
+
+        .mode-toggle {
+            display: flex;
+            margin-top: 15px;
+        }
+
+        .mode-option {
+            flex: 1;
+            text-align: center;
+            padding: 8px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .mode-option:first-child {
+            border-radius: 4px 0 0 4px;
+        }
+
+        .mode-option:last-child {
+            border-radius: 0 4px 4px 0;
+        }
+
+        .mode-option.active {
+            background-color: #64ffda;
+            color: #0a192f;
+        }
+
+        #info-panel {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            width: 240px;
+        }
+
+        .info-item {
+            display: flex;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+
+        .info-icon {
+            margin-right: 10px;
+            font-size: 18px;
+            color: #64ffda;
+        }
+
+        .progress-loader {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            text-align: center;
+        }
+
+        .loader {
+            border: 5px solid rgba(100, 255, 218, 0.3);
+            border-radius: 50%;
+            border-top: 5px solid #64ffda;
+            width: 50px;
+            height: 50px;
+            animation: spin 1s linear infinite;
+            margin-bottom: 20px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .loading-text {
+            font-size: 20px;
+            max-width: 300px;
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        /* Mobile responsive adjustments */
+        @media (max-width: 768px) {
+            #top-panel {
+                width: 90%;
+            }
+
+            .search-container {
+                flex-direction: column;
+            }
+
+            #side-panel, #info-panel {
+                width: 45%;
+                max-width: 180px;
+            }
+
+            .avatar-option {
+                width: 50px;
+                padding: 6px;
+            }
+        }
+
+        #controls-hint {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            text-align: center;
+            padding: 10px 20px;
+            border-radius: 20px;
+            background-color: rgba(100, 255, 218, 0.2);
+            font-size: 14px;
+        }
+
+        #weather-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 3;
+        }
+
+        .raindrop {
+            position: absolute;
+            width: 2px;
+            height: 15px;
+            background-color: rgba(184, 213, 238, 0.6);
+            border-radius: 0 0 5px 5px;
+        }
+
+        .snowflake {
+            position: absolute;
+            width: 5px;
+            height: 5px;
+            background-color: rgba(255, 255, 255, 0.8);
+            border-radius: 50%;
+        }
+
+        .cloud {
+            position: absolute;
+            background-color: rgba(255, 255, 255, 0.7);
+            border-radius: 50%;
+            filter: blur(10px);
+        }
+
+        #settings-panel {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            cursor: pointer;
+        }
+
+        #settings-icon {
+            font-size: 24px;
+            color: #64ffda;
+        }
+
+        #settings-menu {
+            position: absolute;
+            top: 80px;
+            right: 20px;
+            width: 250px;
+            display: none;
+        }
+
+        .settings-item {
+            margin-bottom: 15px;
+        }
+
+        .settings-label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+
+        .slider {
+            width: 100%;
+            height: 5px;
+            background: rgba(100, 255, 218, 0.3);
+            outline: none;
+            -webkit-appearance: none;
+        }
+
+        .slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 15px;
+            height: 15px;
+            border-radius: 50%;
+            background: #64ffda;
+            cursor: pointer;
+        }
+
+        #time-of-day {
+            position: absolute;
+            top: 80px;
+            left: 20px;
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            cursor: pointer;
+        }
+
+        #time-icon {
+            font-size: 24px;
+            color: #64ffda;
+        }
+
+        #minimap {
+            position: absolute;
+            bottom: 20px;
+            right: 270px;
+            width: 150px;
+            height: 150px;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        #map-container {
+            width: 100%;
+            height: 100%;
+        }
+
+        #coordinates-display {
+            position: absolute;
+            bottom: 180px;
+            right: 20px;
+            background-color: rgba(10, 25, 47, 0.85);
+            padding: 5px 10px;
+            border-radius: 4px;
+            font-size: 12px;
+        }
+
+        #screenshot-btn {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            cursor: pointer;
+        }
+
+        #screenshot-icon {
+            font-size: 24px;
+            color: #64ffda;
+        }
+
+        #notification {
+            position: absolute;
+            top: 80px;
+            left: 50%;
+            transform: translateX(-50%);
+            background-color: rgba(100, 255, 218, 0.9);
+            color: #0a192f;
+            padding: 10px 20px;
+            border-radius: 20px;
+            font-weight: bold;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+    </style>
 </head>
 <body>
     <div id="container">
@@ -73,9 +488,1829 @@
                 <div class="loader"></div>
                 <div class="loading-text">Building your world...</div>
             </div>
+
+            <div id="settings-panel" class="panel">
+                <div id="settings-icon">⚙️</div>
+            </div>
+
+            <div id="settings-menu" class="panel">
+                <div class="settings-item">
+                    <label class="settings-label">Graphics Quality</label>
+                    <input type="range" min="0" max="2" value="1" class="slider" id="quality-slider">
+                    <div id="quality-value">Medium</div>
+                </div>
+                <div class="settings-item">
+                    <label class="settings-label">Draw Distance</label>
+                    <input type="range" min="100" max="1000" value="500" class="slider" id="draw-distance-slider">
+                    <div id="draw-distance-value">500m</div>
+                </div>
+                <div class="settings-item">
+                    <label class="settings-label">Sound Volume</label>
+                    <input type="range" min="0" max="100" value="50" class="slider" id="volume-slider">
+                    <div id="volume-value">50%</div>
+                </div>
+            </div>
+
+            <div id="time-of-day" class="panel">
+                <div id="time-icon">🌞</div>
+            </div>
+
+            <div id="minimap" class="panel">
+                <div id="map-container"></div>
+            </div>
+
+            <div id="coordinates-display" class="panel">
+                <div>Lat: <span id="latitude">0.000</span></div>
+                <div>Lng: <span id="longitude">0.000</span></div>
+                <div>Alt: <span id="altitude">0</span>m</div>
+            </div>
+
+            <div id="screenshot-btn" class="panel">
+                <div id="screenshot-icon">📷</div>
+            </div>
+
+            <div id="notification">Notification message</div>
         </div>
     </div>
 
-    <script src="script.js"></script>
+    <script>
+        // Configuration
+        const config = {
+            avatar: 'car',
+            mode: 'navigation',
+            isMobile: /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent),
+            avatarHeight: {
+                car: 1.5,
+                person: 1.7,
+                spaceship: 100
+            },
+            avatarSpeed: {
+                car: 0.3,
+                person: 0.1,
+                spaceship: 0.8
+            },
+            freeRoamSpeed: {
+                car: 0.5,
+                person: 0.2,
+                spaceship: 2.0
+            },
+            rotationSpeed: 0.02,
+            verticalSpeed: 0.3,
+            timeOfDay: 'day',
+            weatherProbability: {
+                clear: 0.6,
+                rain: 0.2,
+                cloudy: 0.15,
+                snow: 0.05
+            },
+            quality: 1, // 0: low, 1: medium, 2: high
+            drawDistance: 500,
+            volume: 50,
+            gravity: 9.8,
+            collisionDetection: true,
+            terrainDetail: 64,
+            buildingDensity: 0.7
+        };
+
+        // Three.js variables
+        let scene, camera, renderer, controls;
+        let avatar, ground, buildings = [], trees = [], vehicles = [];
+        let skybox, water, terrain;
+        let clock = new THREE.Clock();
+        let raycaster = new THREE.Raycaster();
+        let mouse = new THREE.Vector2();
+        let moveForward = false, moveBackward = false, moveLeft = false, moveRight = false, moveUp = false, moveDown = false;
+        let rotateLeft = false, rotateRight = false;
+        let velocity = new THREE.Vector3();
+        let direction = new THREE.Vector3();
+        let rotation = new THREE.Euler(0, 0, 0, 'YXZ');
+        let cameraOffset = new THREE.Vector3(0, 2, 5);
+        let orbitControls;
+
+        // OpenStreetMap variables
+        let map;
+        let currentRoute = null;
+        let routePoints = [];
+        let currentRouteIndex = 0;
+        let currentLocation = { lat: 37.7749, lng: -122.4194 }; // Default: San Francisco
+        let destination = { lat: 34.0522, lng: -118.2437 }; // Default: Los Angeles
+        let routeLayer;
+
+        // Weather simulation variables
+        let weatherTypes = ['clear', 'rain', 'cloudy', 'snow'];
+        let currentWeather = 'clear';
+        let weatherParticles = [];
+        let clouds = [];
+        let rainSound, thunderSound, windSound, ambientSound;
+
+        // Time variables
+        let dayNightCycle = false;
+        let timeScale = 60; // 1 minute in real time = 1 hour in simulation
+        let currentTime = 12; // Start at noon
+
+        // UI elements
+        const avatarOptions = document.querySelectorAll('.avatar-option');
+        const modeOptions = document.querySelectorAll('.mode-option');
+        const navigateBtn = document.getElementById('navigate-btn');
+        const startLocationInput = document.getElementById('start-location');
+        const destinationInput = document.getElementById('destination');
+        const etaSpan = document.getElementById('eta');
+        const distanceSpan = document.getElementById('distance');
+        const weatherSpan = document.getElementById('weather');
+        const trafficSpan = document.getElementById('traffic');
+        const loader = document.getElementById('loader');
+        const desktopControls = document.getElementById('desktop-controls');
+        const mobileControls = document.getElementById('mobile-controls');
+        const weatherOverlay = document.getElementById('weather-overlay');
+        const settingsPanel = document.getElementById('settings-panel');
+        const settingsMenu = document.getElementById('settings-menu');
+        const qualitySlider = document.getElementById('quality-slider');
+        const qualityValue = document.getElementById('quality-value');
+        const drawDistanceSlider = document.getElementById('draw-distance-slider');
+        const drawDistanceValue = document.getElementById('draw-distance-value');
+        const volumeSlider = document.getElementById('volume-slider');
+        const volumeValue = document.getElementById('volume-value');
+        const timeOfDayBtn = document.getElementById('time-of-day');
+        const timeIcon = document.getElementById('time-icon');
+        const mapContainer = document.getElementById('map-container');
+        const latitudeSpan = document.getElementById('latitude');
+        const longitudeSpan = document.getElementById('longitude');
+        const altitudeSpan = document.getElementById('altitude');
+        const screenshotBtn = document.getElementById('screenshot-btn');
+        const notification = document.getElementById('notification');
+
+        // Audio context
+        let audioContext;
+        let audioInitialized = false;
+        let masterGainNode;
+
+        // Initialize the application
+        init();
+
+        // Initialize the scene
+        function init() {
+            // Update controls display based on device
+            if (config.isMobile) {
+                desktopControls.classList.add('hidden');
+                mobileControls.classList.remove('hidden');
+            }
+
+            // Initialize map
+            initMap();
+
+            // Create THREE.js scene
+            initThreeJS();
+            
+            // Initialize audio
+            initAudio();
+            
+            // Add event listeners
+            addEventListeners();
+            
+            // Start animation loop
+            animate();
+            
+            // Hide loader after initialization
+            setTimeout(() => {
+                loader.classList.add('hidden');
+            }, 3000);
+            
+            // Demo weather effect (simulated)
+            setTimeout(() => {
+                changeWeather('rain');
+            }, 10000);
+            
+            // Set random traffic condition every 30 seconds
+            setInterval(() => {
+                const trafficConditions = ['Low', 'Moderate', 'Heavy'];
+                trafficSpan.textContent = trafficConditions[Math.floor(Math.random() * trafficConditions.length)];
+            }, 30000);
+
+            // Start day-night cycle
+            if (dayNightCycle) {
+                setInterval(updateTimeOfDay, 1000);
+            }
+        }
+
+        // Initialize OpenStreetMap
+        function initMap() {
+            // Create map
+            map = L.map(mapContainer, {
+                attributionControl: false,
+                zoomControl: false
+            }).setView([currentLocation.lat, currentLocation.lng], 13);
+            
+            // Add tile layer
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                maxZoom: 19
+            }).addTo(map);
+            
+            // Disable interactions
+            map.dragging.disable();
+            map.touchZoom.disable();
+            map.doubleClickZoom.disable();
+            map.scrollWheelZoom.disable();
+            map.boxZoom.disable();
+            map.keyboard.disable();
+            
+            // Create route layer
+            routeLayer = L.layerGroup().addTo(map);
+            
+            // Add marker for current location
+            L.marker([currentLocation.lat, currentLocation.lng]).addTo(map);
+        }
+
+        // Initialize Three.js scene
+        function initThreeJS() {
+            // Create scene
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x87CEEB); // Sky blue background
+            
+            // Add fog for distance fade
+            scene.fog = new THREE.FogExp2(0x87CEEB, 0.0015);
+            
+            // Create camera
+            camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+            camera.position.set(0, config.avatarHeight[config.avatar], 5);
+            
+            // Create renderer
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.shadowMap.enabled = true;
+            renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+            document.getElementById('scene-container').appendChild(renderer.domElement);
+            
+            // Add ambient light
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
+            scene.add(ambientLight);
+            
+            // Add directional light (sun)
+            const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+            directionalLight.position.set(100, 100, 50);
+            directionalLight.castShadow = true;
+            directionalLight.shadow.mapSize.width = 2048;
+            directionalLight.shadow.mapSize.height = 2048;
+            directionalLight.shadow.camera.near = 0.5;
+            directionalLight.shadow.camera.far = 500;
+            directionalLight.shadow.camera.left = -100;
+            directionalLight.shadow.camera.right = 100;
+            directionalLight.shadow.camera.top = 100;
+            directionalLight.shadow.camera.bottom = -100;
+            scene.add(directionalLight);
+            
+            // Create skybox
+            createSkybox();
+            
+            // Create the ground
+            createGround();
+            
+            // Create water
+            createWater();
+            
+            // Create avatar
+            createAvatar();
+            
+            // Create sample environment (temporary placeholder for map data)
+            createSampleEnvironment();
+            
+            // Create orbit controls for free roam mode
+            orbitControls = new THREE.OrbitControls(camera, renderer.domElement);
+            orbitControls.enableDamping = true;
+            orbitControls.dampingFactor = 0.05;
+            orbitControls.screenSpacePanning = false;
+            orbitControls.minDistance = 1;
+            orbitControls.maxDistance = 500;
+            orbitControls.maxPolarAngle = Math.PI / 2;
+            orbitControls.enabled = false; // Disabled by default
+            
+            // Handle window resize
+            window.addEventListener('resize', onWindowResize, false);
+        }
+
+        // Create skybox
+        function createSkybox() {
+            const skyboxGeometry = new THREE.BoxGeometry(1000, 1000, 1000);
+            const skyboxMaterials = [
+                new THREE.MeshBasicMaterial({ color: 0x87CEEB, side: THREE.BackSide }), // Right
+                new THREE.MeshBasicMaterial({ color: 0x87CEEB, side: THREE.BackSide }), // Left
+                new THREE.MeshBasicMaterial({ color: 0x87CEEB, side: THREE.BackSide }), // Top
+                new THREE.MeshBasicMaterial({ color: 0x87CEEB, side: THREE.BackSide }), // Bottom
+                new THREE.MeshBasicMaterial({ color: 0x87CEEB, side: THREE.BackSide }), // Front
+                new THREE.MeshBasicMaterial({ color: 0x87CEEB, side: THREE.BackSide })  // Back
+            ];
+            skybox = new THREE.Mesh(skyboxGeometry, skyboxMaterials);
+            scene.add(skybox);
+        }
+
+        // Create water
+        function createWater() {
+            const waterGeometry = new THREE.PlaneGeometry(1000, 1000);
+            const waterMaterial = new THREE.MeshStandardMaterial({
+                color: 0x0077be,
+                transparent: true,
+                opacity: 0.8,
+                roughness: 0.1,
+                metalness: 0.2
+            });
+            water = new THREE.Mesh(waterGeometry, waterMaterial);
+            water.rotation.x = -Math.PI / 2;
+            water.position.y = -5;
+            water.receiveShadow = true;
+            scene.add(water);
+        }
+
+        // Create ground plane
+        function createGround() {
+            const groundGeometry = new THREE.PlaneGeometry(1000, 1000, config.terrainDetail, config.terrainDetail);
+            
+            // Add terrain variation
+            const vertices = groundGeometry.attributes.position.array;
+            for (let i = 0; i < vertices.length; i += 3) {
+                // Skip water areas
+                const x = vertices[i];
+                const z = vertices[i + 2];
+                const distance = Math.sqrt(x * x + z * z);
+                
+                if (distance > 100) {
+                    vertices[i + 1] = Math.sin(x / 20) * Math.cos(z / 20) * 5;
+                }
+            }
+            
+            groundGeometry.computeVertexNormals();
+            
+            const groundMaterial = new THREE.MeshStandardMaterial({ 
+                color: 0x1a472a, 
+                roughness: 0.8,
+                metalness: 0.2
+            });
+            
+            ground = new THREE.Mesh(groundGeometry, groundMaterial);
+            ground.rotation.x = -Math.PI / 2;
+            ground.receiveShadow = true;
+            scene.add(ground);
+        }
+
+        // Create avatar based on selected type
+        function createAvatar() {
+            if (avatar) scene.remove(avatar);
+            
+            let geometry, material;
+            
+            switch(config.avatar) {
+                case 'car':
+                    // Create car body
+                    geometry = new THREE.BoxGeometry(2, 1, 4);
+                    material = new THREE.MeshStandardMaterial({ color: 0x0066ff });
+                    avatar = new THREE.Mesh(geometry, material);
+                    
+                    // Add wheels
+                    const wheelGeometry = new THREE.CylinderGeometry(0.5, 0.5, 0.2, 16);
+                    const wheelMaterial = new THREE.MeshStandardMaterial({ color: 0x333333 });
+                    
+                    const wheelPositions = [
+                        [-0.8, -0.3, 1.2],  // Front left
+                        [0.8, -0.3, 1.2],   // Front right
+                        [-0.8, -0.3, -1.2], // Back left
+                        [0.8, -0.3, -1.2]   // Back right
+                    ];
+                    
+                    wheelPositions.forEach(position => {
+                        const wheel = new THREE.Mesh(wheelGeometry, wheelMaterial);
+                        wheel.position.set(...position);
+                        wheel.rotation.z = Math.PI / 2;
+                        wheel.castShadow = true;
+                        avatar.add(wheel);
+                    });
+                    
+                    // Add windows
+                    const windshieldGeometry = new THREE.BoxGeometry(1.8, 0.5, 0.1);
+                    const windowMaterial = new THREE.MeshStandardMaterial({ 
+                        color: 0x88ccff,
+                        transparent: true,
+                        opacity: 0.7
+                    });
+                    
+                    const windshield = new THREE.Mesh(windshieldGeometry, windowMaterial);
+                    windshield.position.set(0, 0.5, 1.5);
+                    avatar.add(windshield);
+                    
+                    const rearWindow = new THREE.Mesh(windshieldGeometry, windowMaterial);
+                    rearWindow.position.set(0, 0.5, -1.5);
+                    avatar.add(rearWindow);
+                    
+                    break;
+                    
+                case 'person':
+                    // Create body
+                    const bodyGeometry = new THREE.CapsuleGeometry(0.25, 1, 4, 8);
+                    const bodyMaterial = new THREE.MeshStandardMaterial({ color: 0xff6600 });
+                    avatar = new THREE.Mesh(bodyGeometry, bodyMaterial);
+                    
+                    // Create head
+                    const headGeometry = new THREE.SphereGeometry(0.25, 16, 16);
+                    const headMaterial = new THREE.MeshStandardMaterial({ color: 0xffcc99 });
+                    const head = new THREE.Mesh(headGeometry, headMaterial);
+                    head.position.y = 0.75;
+                    avatar.add(head);
+                    
+                    // Create arms
+                    const armGeometry = new THREE.CapsuleGeometry(0.08, 0.5, 4, 8);
+                    const armMaterial = new THREE.MeshStandardMaterial({ color: 0xff6600 });
+                    
+                    const leftArm = new THREE.Mesh(armGeometry, armMaterial);
+                    leftArm.position.set(-0.35, 0.2, 0);
+                    leftArm.rotation.z = Math.PI / 6;
+                    avatar.add(leftArm);
+                    
+                    const rightArm = new THREE.Mesh(armGeometry, armMaterial);
+                    rightArm.position.set(0.35, 0.2, 0);
+                    rightArm.rotation.z = -Math.PI / 6;
+                    avatar.add(rightArm);
+                    
+                    // Create legs
+                    const legGeometry = new THREE.CapsuleGeometry(0.1, 0.5, 4, 8);
+                    const legMaterial = new THREE.MeshStandardMaterial({ color: 0x0066cc });
+                    
+                    const leftLeg = new THREE.Mesh(legGeometry, legMaterial);
+                    leftLeg.position.set(-0.15, -0.6, 0);
+                    avatar.add(leftLeg);
+                    
+                    const rightLeg = new THREE.Mesh(legGeometry, legMaterial);
+                    rightLeg.position.set(0.15, -0.6, 0);
+                    avatar.add(rightLeg);
+                    
+                    break;
+                    
+                case 'spaceship':
+                    // Create main body
+                    geometry = new THREE.ConeGeometry(1, 3, 16);
+                    material = new THREE.MeshStandardMaterial({ 
+                        color: 0xffcc00,
+                        metalness: 0.7,
+                        roughness: 0.2
+                    });
+                    avatar = new THREE.Mesh(geometry, material);
+                    avatar.rotation.x = Math.PI / 2;
+                    
+                    // Add cockpit
+                    const cockpitGeometry = new THREE.SphereGeometry(0.7, 16, 16, 0, Math.PI * 2, 0, Math.PI / 2);
+                    const cockpitMaterial = new THREE.MeshStandardMaterial({ 
+                        color: 0x88ccff,
+                        transparent: true,
+                        opacity: 0.7
+                    });
+                    const cockpit = new THREE.Mesh(cockpitGeometry, cockpitMaterial);
+                    cockpit.position.set(0, 0, 1);
+                    cockpit.rotation.x = Math.PI;
+                    avatar.add(cockpit);
+                    
+                    // Add wings
+                    const wingGeometry = new THREE.BoxGeometry(3, 0.1, 1);
+                    const wingMaterial = new THREE.MeshStandardMaterial({ color: 0xcc0000 });
+                    const wings = new THREE.Mesh(wingGeometry, wingMaterial);
+                    wings.position.set(0, 0, -0.5);
+                    avatar.add(wings);
+                    
+                    // Add thrusters
+                    const thrusterGeometry = new THREE.CylinderGeometry(0.3, 0.5, 0.5, 16);
+                    const thrusterMaterial = new THREE.MeshStandardMaterial({ color: 0x333333 });
+                    
+                    const leftThruster = new THREE.Mesh(thrusterGeometry, thrusterMaterial);
+                    leftThruster.position.set(-0.8, 0, -1.2);
+                    leftThruster.rotation.x = Math.PI / 2;
+                    avatar.add(leftThruster);
+                    
+                    const rightThruster = new THREE.Mesh(thrusterGeometry, thrusterMaterial);
+                    rightThruster.position.set(0.8, 0, -1.2);
+                    rightThruster.rotation.x = Math.PI / 2;
+                    avatar.add(rightThruster);
+                    
+                    // Add thruster glow
+                    const glowGeometry = new THREE.ConeGeometry(0.3, 1, 16);
+                    const glowMaterial = new THREE.MeshBasicMaterial({ 
+                        color: 0xff6600,
+                        transparent: true,
+                        opacity: 0.7
+                    });
+                    
+                    const leftGlow = new THREE.Mesh(glowGeometry, glowMaterial);
+                    leftGlow.position.set(-0.8, 0, -1.7);
+                    leftGlow.rotation.x = -Math.PI / 2;
+                    avatar.add(leftGlow);
+                    
+                    const rightGlow = new THREE.Mesh(glowGeometry, glowMaterial);
+                    rightGlow.position.set(0.8, 0, -1.7);
+                    rightGlow.rotation.x = -Math.PI / 2;
+                    avatar.add(rightGlow);
+                    
+                    break;
+            }
+            
+            avatar.castShadow = true;
+            avatar.receiveShadow = true;
+            
+            // Position the avatar based on type
+            avatar.position.y = config.avatarHeight[config.avatar] / 2;
+            
+            // Add avatar to scene
+            scene.add(avatar);
+            
+            // Position camera relative to the avatar
+            updateCameraPosition();
+        }
+
+        // Create sample environment
+        function createSampleEnvironment() {
+            // Clear existing buildings
+            buildings.forEach(building => scene.remove(building));
+            buildings = [];
+            
+            // Clear existing trees
+            trees.forEach(tree => scene.remove(tree));
+            trees = [];
+            
+            // Clear existing vehicles
+            vehicles.forEach(vehicle => scene.remove(vehicle));
+            vehicles = [];
+            
+            // Create buildings
+            const buildingCount = 50;
+            const buildingColors = [0x999999, 0xcccccc, 0x666666, 0x333333, 0x996633];
+            
+            for (let i = 0; i < buildingCount; i++) {
+                const x = (Math.random() - 0.5) * 200;
+                const z = (Math.random() - 0.5) * 200;
+                
+                // Skip if too close to avatar
+                if (Math.abs(x) < 10 && Math.abs(z) < 10) continue;
+                
+                const width = 5 + Math.random() * 10;
+                const height = 10 + Math.random() * 40;
+                const depth = 5 + Math.random() * 10;
+                
+                const geometry = new THREE.BoxGeometry(width, height, depth);
+                const material = new THREE.MeshStandardMaterial({ 
+                    color: buildingColors[Math.floor(Math.random() * buildingColors.length)],
+                    roughness: 0.7,
+                    metalness: 0.2
+                });
+                
+                const building = new THREE.Mesh(geometry, material);
+                building.position.set(x, height / 2, z);
+                building.castShadow = true;
+                building.receiveShadow = true;
+                
+                // Add windows
+                const windowSize = 1;
+                const windowSpacing = 2;
+                const windowGeometry = new THREE.PlaneGeometry(windowSize, windowSize);
+                const windowMaterial = new THREE.MeshBasicMaterial({ 
+                    color: 0xffffcc,
+                    transparent: true,
+                    opacity: Math.random() > 0.5 ? 0.9 : 0
+                });
+                
+                // Front windows
+                for (let wx = -width / 2 + windowSize; wx < width / 2; wx += windowSpacing) {
+                    for (let wy = windowSize; wy < height; wy += windowSpacing) {
+                        const window = new THREE.Mesh(windowGeometry, windowMaterial.clone());
+                        window.position.set(0, wy - height / 2, depth / 2 + 0.01);
+                        building.add(window);
+                    }
+                }
+                
+                // Side windows
+                for (let wz = -depth / 2 + windowSize; wz < depth / 2; wz += windowSpacing) {
+                    for (let wy = windowSize; wy < height; wy += windowSpacing) {
+                        const window = new THREE.Mesh(windowGeometry, windowMaterial.clone());
+                        window.position.set(width / 2 + 0.01, wy - height / 2, wz);
+                        window.rotation.y = Math.PI / 2;
+                        building.add(window);
+                    }
+                }
+                
+                scene.add(building);
+                buildings.push(building);
+            }
+            
+            // Create trees
+            const treeCount = 100;
+            
+            for (let i = 0; i < treeCount; i++) {
+                const x = (Math.random() - 0.5) * 300;
+                const z = (Math.random() - 0.5) * 300;
+                
+                // Skip if too close to avatar or buildings
+                if (Math.abs(x) < 10 && Math.abs(z) < 10) continue;
+                
+                let tooCloseToBuilding = false;
+                for (const building of buildings) {
+                    const dx = x - building.position.x;
+                    const dz = z - building.position.z;
+                    const distance = Math.sqrt(dx * dx + dz * dz);
+                    if (distance < 10) {
+                        tooCloseToBuilding = true;
+                        break;
+                    }
+                }
+                
+                if (tooCloseToBuilding) continue;
+                
+                // Create tree
+                const tree = new THREE.Group();
+                
+                // Trunk
+                const trunkGeometry = new THREE.CylinderGeometry(0.5, 0.7, 2, 8);
+                const trunkMaterial = new THREE.MeshStandardMaterial({ color: 0x8B4513 });
+                const trunk = new THREE.Mesh(trunkGeometry, trunkMaterial);
+                trunk.castShadow = true;
+                trunk.receiveShadow = true;
+                tree.add(trunk);
+                
+                // Leaves
+                const leavesGeometry = new THREE.ConeGeometry(2, 4, 8);
+                const leavesMaterial = new THREE.MeshStandardMaterial({ 
+                    color: 0x228B22,
+                    roughness: 1.0
+                });
+                const leaves = new THREE.Mesh(leavesGeometry, leavesMaterial);
+                leaves.position.y = 3;
+                leaves.castShadow = true;
+                tree.add(leaves);
+                
+                tree.position.set(x, 1, z);
+                scene.add(tree);
+                trees.push(tree);
+            }
+            
+            // Create roads
+            createRoads();
+            
+            // Create traffic
+            createTraffic();
+        }
+
+        // Create roads
+        function createRoads() {
+            // Main road
+            const roadGeometry = new THREE.PlaneGeometry(10, 200);
+            const roadMaterial = new THREE.MeshStandardMaterial({ 
+                color: 0x333333,
+                roughness: 0.9
+            });
+            
+            const mainRoad = new THREE.Mesh(roadGeometry, roadMaterial);
+            mainRoad.rotation.x = -Math.PI / 2;
+            mainRoad.position.y = 0.01; // Slightly above ground to prevent z-fighting
+            scene.add(mainRoad);
+            
+            // Cross road
+            const crossRoadGeometry = new THREE.PlaneGeometry(200, 10);
+            const crossRoad = new THREE.Mesh(crossRoadGeometry, roadMaterial);
+            crossRoad.rotation.x = -Math.PI / 2;
+            crossRoad.position.y = 0.02; // Slightly above main road
+            scene.add(crossRoad);
+            
+            // Road markings
+            const markingGeometry = new THREE.PlaneGeometry(0.5, 5);
+            const markingMaterial = new THREE.MeshBasicMaterial({ color: 0xffffff });
+            
+            for (let z = -95; z <= 95; z += 10) {
+                const marking = new THREE.Mesh(markingGeometry, markingMaterial);
+                marking.rotation.x = -Math.PI / 2;
+                marking.position.set(0, 0.03, z);
+                scene.add(marking);
+            }
+            
+            for (let x = -95; x <= 95; x += 10) {
+                const marking = new THREE.Mesh(markingGeometry, markingMaterial);
+                marking.rotation.set(-Math.PI / 2, 0, Math.PI / 2);
+                marking.position.set(x, 0.03, 0);
+                scene.add(marking);
+            }
+        }
+
+        // Create traffic
+        function createTraffic() {
+            const vehicleCount = 10;
+            const vehicleColors = [0xff0000, 0x00ff00, 0x0000ff, 0xffff00, 0xff00ff, 0x00ffff];
+            
+            for (let i = 0; i < vehicleCount; i++) {
+                // Determine if vehicle is on main road or cross road
+                const onMainRoad = Math.random() > 0.5;
+                
+                let x, z;
+                if (onMainRoad) {
+                    x = -4 + Math.floor(Math.random() * 2) * 8; // Left or right lane
+                    z = (Math.random() - 0.5) * 190;
+                } else {
+                    x = (Math.random() - 0.5) * 190;
+                    z = -4 + Math.floor(Math.random() * 2) * 8; // Top or bottom lane
+                }
+                
+                // Create vehicle
+                const vehicleGeometry = new THREE.BoxGeometry(1.8, 1, 4);
+                const vehicleMaterial = new THREE.MeshStandardMaterial({ 
+                    color: vehicleColors[Math.floor(Math.random() * vehicleColors.length)]
+                });
+                
+                const vehicle = new THREE.Mesh(vehicleGeometry, vehicleMaterial);
+                vehicle.position.set(x, 0.5, z);
+                
+                // Set rotation based on road
+                if (!onMainRoad) {
+                    vehicle.rotation.y = Math.PI / 2;
+                }
+                
+                vehicle.castShadow = true;
+                vehicle.receiveShadow = true;
+                
+                // Add to scene
+                scene.add(vehicle);
+                vehicles.push({
+                    mesh: vehicle,
+                    speed: 0.1 + Math.random() * 0.2,
+                    onMainRoad: onMainRoad,
+                    direction: Math.random() > 0.5 ? 1 : -1
+                });
+            }
+        }
+
+        // Initialize audio
+        function initAudio() {
+            // Create audio context
+            try {
+                audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                masterGainNode = audioContext.createGain();
+                masterGainNode.connect(audioContext.destination);
+                setVolume(config.volume);
+            } catch (e) {
+                console.error('Web Audio API is not supported in this browser');
+            }
+        }
+
+        // Set volume
+        function setVolume(value) {
+            if (masterGainNode) {
+                masterGainNode.gain.value = value / 100;
+            }
+        }
+
+        // Load and play sound
+        function loadSound(url, loop = false) {
+            if (!audioContext) return null;
+            
+            const sound = {
+                source: null,
+                gainNode: audioContext.createGain(),
+                play: function() {
+                    if (this.source) {
+                        this.source.stop();
+                    }
+                    
+                    this.source = audioContext.createBufferSource();
+                    this.source.buffer = this.buffer;
+                    this.source.loop = loop;
+                    this.source.connect(this.gainNode);
+                    this.gainNode.connect(masterGainNode);
+                    this.source.start();
+                },
+                stop: function() {
+                    if (this.source) {
+                        this.source.stop();
+                    }
+                }
+            };
+            
+            fetch(url)
+                .then(response => response.arrayBuffer())
+                .then(arrayBuffer => audioContext.decodeAudioData(arrayBuffer))
+                .then(audioBuffer => {
+                    sound.buffer = audioBuffer;
+                })
+                .catch(error => console.error('Error loading sound:', error));
+                
+            return sound;
+        }
+
+        // Add event listeners
+        function addEventListeners() {
+            // Avatar selection
+            avatarOptions.forEach(option => {
+                option.addEventListener('click', () => {
+                    // Remove active class from all options
+                    avatarOptions.forEach(opt => opt.classList.remove('active'));
+                    
+                    // Add active class to selected option
+                    option.classList.add('active');
+                    
+                    // Update avatar
+                    config.avatar = option.dataset.avatar;
+                    createAvatar();
+                });
+            });
+            
+            // Mode selection
+            modeOptions.forEach(option => {
+                option.addEventListener('click', () => {
+                    // Remove active class from all options
+                    modeOptions.forEach(opt => opt.classList.remove('active'));
+                    
+                    // Add active class to selected option
+                    option.classList.add('active');
+                    
+                    // Update mode
+                    const newMode = option.dataset.mode;
+                    
+                    if (newMode !== config.mode) {
+                        config.mode = newMode;
+                        
+                        // Toggle orbit controls based on mode
+                        if (config.mode === 'free-roam') {
+                            orbitControls.enabled = true;
+                            showNotification('Free Roam Mode Activated');
+                        } else {
+                            orbitControls.enabled = false;
+                            updateCameraPosition();
+                            showNotification('Navigation Mode Activated');
+                        }
+                    }
+                });
+            });
+            
+            // Navigation button
+            navigateBtn.addEventListener('click', () => {
+                const start = startLocationInput.value || 'Current Location';
+                const end = destinationInput.value;
+                
+                if (!end) {
+                    showNotification('Please enter a destination');
+                    return;
+                }
+                
+                calculateRoute(start, end);
+            });
+            
+            // Keyboard controls
+            document.addEventListener('keydown', onKeyDown);
+            document.addEventListener('keyup', onKeyUp);
+            
+            // Mouse controls
+            document.addEventListener('mousedown', onMouseDown);
+            document.addEventListener('mouseup', onMouseUp);
+            document.addEventListener('mousemove', onMouseMove);
+            
+            // Touch controls for mobile
+            if (config.isMobile) {
+                document.addEventListener('touchstart', onTouchStart);
+                document.addEventListener('touchend', onTouchEnd);
+                document.addEventListener('touchmove', onTouchMove);
+            }
+            
+            // Settings panel
+            settingsPanel.addEventListener('click', () => {
+                settingsMenu.style.display = settingsMenu.style.display === 'none' ? 'block' : 'none';
+            });
+            
+            // Quality slider
+            qualitySlider.addEventListener('input', () => {
+                const quality = parseInt(qualitySlider.value);
+                config.quality = quality;
+                
+                const qualityLabels = ['Low', 'Medium', 'High'];
+                qualityValue.textContent = qualityLabels[quality];
+                
+                updateQualitySettings();
+            });
+            
+            // Draw distance slider
+            drawDistanceSlider.addEventListener('input', () => {
+                const distance = parseInt(drawDistanceSlider.value);
+                config.drawDistance = distance;
+                drawDistanceValue.textContent = `${distance}m`;
+                
+                updateFogDensity();
+            });
+            
+            // Volume slider
+            volumeSlider.addEventListener('input', () => {
+                const volume = parseInt(volumeSlider.value);
+                config.volume = volume;
+                volumeValue.textContent = `${volume}%`;
+                
+                setVolume(volume);
+            });
+            
+            // Time of day button
+            timeOfDayBtn.addEventListener('click', () => {
+                toggleTimeOfDay();
+            });
+            
+            // Screenshot button
+            screenshotBtn.addEventListener('click', () => {
+                takeScreenshot();
+            });
+            
+            // Initialize settings values
+            qualitySlider.value = config.quality;
+            drawDistanceSlider.value = config.drawDistance;
+            volumeSlider.value = config.volume;
+            
+            const qualityLabels = ['Low', 'Medium', 'High'];
+            qualityValue.textContent = qualityLabels[config.quality];
+            drawDistanceValue.textContent = `${config.drawDistance}m`;
+            volumeValue.textContent = `${config.volume}%`;
+        }
+
+        // Update quality settings
+        function updateQualitySettings() {
+            switch (config.quality) {
+                case 0: // Low
+                    renderer.setPixelRatio(1);
+                    renderer.shadowMap.enabled = false;
+                    scene.fog.density = 0.003;
+                    break;
+                case 1: // Medium
+                    renderer.setPixelRatio(window.devicePixelRatio);
+                    renderer.shadowMap.enabled = true;
+                    renderer.shadowMap.type = THREE.PCFShadowMap;
+                    scene.fog.density = 0.0015;
+                    break;
+                case 2: // High
+                    renderer.setPixelRatio(window.devicePixelRatio);
+                    renderer.shadowMap.enabled = true;
+                    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+                    scene.fog.density = 0.001;
+                    break;
+            }
+        }
+
+        // Update fog density based on draw distance
+        function updateFogDensity() {
+            scene.fog.density = 5 / config.drawDistance;
+        }
+
+        // Toggle time of day
+        function toggleTimeOfDay() {
+            if (config.timeOfDay === 'day') {
+                config.timeOfDay = 'night';
+                timeIcon.textContent = '🌙';
+                scene.background = new THREE.Color(0x0a1020);
+                scene.fog.color = new THREE.Color(0x0a1020);
+                
+                // Update skybox
+                skybox.material.forEach(material => {
+                    material.color.set(0x0a1020);
+                });
+                
+                showNotification('Night Mode Activated');
+            } else {
+                config.timeOfDay = 'day';
+                timeIcon.textContent = '🌞';
+                scene.background = new THREE.Color(0x87CEEB);
+                scene.fog.color = new THREE.Color(0x87CEEB);
+                
+                // Update skybox
+                skybox.material.forEach(material => {
+                    material.color.set(0x87CEEB);
+                });
+                
+                showNotification('Day Mode Activated');
+            }
+        }
+
+        // Update time of day for day-night cycle
+        function updateTimeOfDay() {
+            currentTime += 1 / timeScale;
+            if (currentTime >= 24) currentTime = 0;
+            
+            // Calculate sun position
+            const sunAngle = (currentTime - 6) * Math.PI / 12; // 0 at 6am, PI at 6pm
+            const sunIntensity = Math.max(0, Math.cos(sunAngle));
+            
+            // Update directional light
+            const directionalLight = scene.children.find(child => child instanceof THREE.DirectionalLight);
+            if (directionalLight) {
+                directionalLight.position.set(
+                    100 * Math.cos(sunAngle),
+                    100 * Math.sin(sunAngle),
+                    50
+                );
+                directionalLight.intensity = 0.2 + sunIntensity * 0.8;
+            }
+            
+            // Update ambient light
+            const ambientLight = scene.children.find(child => child instanceof THREE.AmbientLight);
+            if (ambientLight) {
+                ambientLight.intensity = 0.2 + sunIntensity * 0.3;
+            }
+            
+            // Update sky color
+            const skyColor = new THREE.Color();
+            if (sunAngle < 0) { // Night
+                skyColor.setRGB(0.05, 0.1, 0.2);
+            } else if (sunAngle < Math.PI / 6) { // Sunrise
+                const t = (sunAngle + Math.PI / 6) / (Math.PI / 3);
+                skyColor.setRGB(
+                    0.05 + t * 0.5,
+                    0.1 + t * 0.5,
+                    0.2 + t * 0.5
+                );
+            } else if (sunAngle < Math.PI * 5 / 6) { // Day
+                skyColor.setRGB(0.53, 0.81, 0.92);
+            } else { // Sunset
+                const t = (sunAngle - Math.PI * 5 / 6) / (Math.PI / 3);
+                skyColor.setRGB(
+                    0.53 - t * 0.48,
+                    0.81 - t * 0.71,
+                    0.92 - t * 0.72
+                );
+            }
+            
+            scene.background = skyColor;
+            scene.fog.color = skyColor;
+            
+            // Update skybox
+            skybox.material.forEach(material => {
+                material.color.copy(skyColor);
+            });
+        }
+
+        // Take screenshot
+        function takeScreenshot() {
+            const link = document.createElement('a');
+            link.download = 'myworld-screenshot.png';
+            
+            renderer.render(scene, camera);
+            link.href = renderer.domElement.toDataURL('image/png');
+            link.click();
+            
+            showNotification('Screenshot Saved');
+        }
+
+        // Show notification
+        function showNotification(message) {
+            notification.textContent = message;
+            notification.style.opacity = 1;
+            
+            setTimeout(() => {
+                notification.style.opacity = 0;
+            }, 3000);
+        }
+
+        // Calculate route using OpenStreetMap
+        function calculateRoute(start, end) {
+            loader.classList.remove('hidden');
+            
+            // Clear previous route
+            routeLayer.clearLayers();
+            
+            // Geocode start and end locations
+            Promise.all([
+                geocodeLocation(start === 'Current Location' ? null : start),
+                geocodeLocation(end)
+            ])
+            .then(([startLocation, endLocation]) => {
+                // Update current location
+                if (startLocation) {
+                    currentLocation = startLocation;
+                }
+                
+                // Update destination
+                destination = endLocation;
+                
+                // Update map view
+                map.fitBounds([
+                    [currentLocation.lat, currentLocation.lng],
+                    [destination.lat, destination.lng]
+                ]);
+                
+                // Add markers
+                L.marker([currentLocation.lat, currentLocation.lng]).addTo(routeLayer);
+                L.marker([destination.lat, destination.lng]).addTo(routeLayer);
+                
+                // Create a simple route (straight line for demo)
+                const routeLine = L.polyline([
+                    [currentLocation.lat, currentLocation.lng],
+                    [destination.lat, destination.lng]
+                ], {
+                    color: '#64ffda',
+                    weight: 5
+                }).addTo(routeLayer);
+                
+                // Calculate distance and ETA
+                const distance = calculateDistance(
+                    currentLocation.lat, currentLocation.lng,
+                    destination.lat, destination.lng
+                );
+                
+                // Update UI
+                distanceSpan.textContent = `${distance.toFixed(1)} km`;
+                
+                // Calculate ETA based on avatar speed
+                const speed = config.avatarSpeed[config.avatar] * 50; // km/h
+                const timeHours = distance / speed;
+                const timeMinutes = Math.round(timeHours * 60);
+                
+                if (timeMinutes < 60) {
+                    etaSpan.textContent = `${timeMinutes} min`;
+                } else {
+                    const hours = Math.floor(timeHours);
+                    const minutes = Math.round((timeHours - hours) * 60);
+                    etaSpan.textContent = `${hours}h ${minutes}m`;
+                }
+                
+                // Create route points
+                routePoints = [
+                    { lat: currentLocation.lat, lng: currentLocation.lng },
+                    { lat: destination.lat, lng: destination.lng }
+                ];
+                
+                // Reset route index
+                currentRouteIndex = 0;
+                
+                // Switch to navigation mode
+                if (config.mode !== 'navigation') {
+                    config.mode = 'navigation';
+                    
+                    // Update UI
+                    modeOptions.forEach(option => {
+                        option.classList.toggle('active', option.dataset.mode === 'navigation');
+                    });
+                    
+                    // Disable orbit controls
+                    orbitControls.enabled = false;
+                }
+                
+                loader.classList.add('hidden');
+                showNotification('Route Calculated');
+            })
+            .catch(error => {
+                loader.classList.add('hidden');
+                showNotification('Error calculating route');
+                console.error(error);
+            });
+        }
+
+        // Geocode location using OpenStreetMap Nominatim API
+        function geocodeLocation(address) {
+            return new Promise((resolve, reject) => {
+                if (!address) {
+                    // Return current location if no address provided
+                    resolve(currentLocation);
+                    return;
+                }
+                
+                // Use Nominatim API for geocoding
+                fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(address)}`)
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data && data.length > 0) {
+                            resolve({
+                                lat: parseFloat(data[0].lat),
+                                lng: parseFloat(data[0].lon)
+                            });
+                        } else {
+                            reject(new Error('Location not found'));
+                        }
+                    })
+                    .catch(error => {
+                        reject(error);
+                    });
+            });
+        }
+
+        // Calculate distance between two points using Haversine formula
+        function calculateDistance(lat1, lon1, lat2, lon2) {
+            const R = 6371; // Radius of the earth in km
+            const dLat = deg2rad(lat2 - lat1);
+            const dLon = deg2rad(lon2 - lon1);
+            const a = 
+                Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+                Math.cos(deg2rad(lat1)) * Math.cos(deg2rad(lat2)) * 
+                Math.sin(dLon / 2) * Math.sin(dLon / 2);
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+            const distance = R * c; // Distance in km
+            return distance;
+        }
+
+        // Convert degrees to radians
+        function deg2rad(deg) {
+            return deg * (Math.PI / 180);
+        }
+
+        // Update avatar position based on current location
+        function updateAvatarPosition() {
+            // Update coordinates display
+            latitudeSpan.textContent = currentLocation.lat.toFixed(3);
+            longitudeSpan.textContent = currentLocation.lng.toFixed(3);
+            altitudeSpan.textContent = Math.round(avatar.position.y);
+        }
+
+        // Update camera position relative to avatar
+        function updateCameraPosition() {
+            if (config.mode === 'navigation') {
+                // Position camera behind avatar
+                const avatarDirection = new THREE.Vector3(0, 0, -1);
+                avatarDirection.applyQuaternion(avatar.quaternion);
+                
+                const cameraPosition = new THREE.Vector3();
+                cameraPosition.copy(avatar.position);
+                cameraPosition.y += cameraOffset.y;
+                
+                // Position camera behind avatar
+                cameraPosition.x -= avatarDirection.x * cameraOffset.z;
+                cameraPosition.z -= avatarDirection.z * cameraOffset.z;
+                
+                camera.position.copy(cameraPosition);
+                camera.lookAt(
+                    avatar.position.x,
+                    avatar.position.y + 1,
+                    avatar.position.z
+                );
+            }
+        }
+
+        // Handle window resize
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        // Handle key down events
+        function onKeyDown(event) {
+            switch (event.code) {
+                case 'KeyW':
+                case 'ArrowUp':
+                    moveForward = true;
+                    break;
+                case 'KeyS':
+                case 'ArrowDown':
+                    moveBackward = true;
+                    break;
+                case 'KeyA':
+                case 'ArrowLeft':
+                    moveLeft = true;
+                    break;
+                case 'KeyD':
+                case 'ArrowRight':
+                    moveRight = true;
+                    break;
+                case 'KeyQ':
+                    rotateLeft = true;
+                    break;
+                case 'KeyE':
+                    rotateRight = true;
+                    break;
+                case 'KeyR':
+                    moveUp = true;
+                    break;
+                case 'KeyF':
+                    moveDown = true;
+                    break;
+                case 'Space':
+                    // Toggle free roam/navigation mode
+                    const newMode = config.mode === 'navigation' ? 'free-roam' : 'navigation';
+                    
+                    // Update UI
+                    modeOptions.forEach(option => {
+                        option.classList.toggle('active', option.dataset.mode === newMode);
+                    });
+                    
+                    // Update mode
+                    config.mode = newMode;
+                    
+                    // Toggle orbit controls
+                    orbitControls.enabled = config.mode === 'free-roam';
+                    
+                    if (config.mode === 'navigation') {
+                        updateCameraPosition();
+                    }
+                    
+                    showNotification(config.mode === 'free-roam' ? 'Free Roam Mode Activated' : 'Navigation Mode Activated');
+                    break;
+            }
+        }
+
+        // Handle key up events
+        function onKeyUp(event) {
+            switch (event.code) {
+                case 'KeyW':
+                case 'ArrowUp':
+                    moveForward = false;
+                    break;
+                case 'KeyS':
+                case 'ArrowDown':
+                    moveBackward = false;
+                    break;
+                case 'KeyA':
+                case 'ArrowLeft':
+                    moveLeft = false;
+                    break;
+                case 'KeyD':
+                case 'ArrowRight':
+                    moveRight = false;
+                    break;
+                case 'KeyQ':
+                    rotateLeft = false;
+                    break;
+                case 'KeyE':
+                    rotateRight = false;
+                    break;
+                case 'KeyR':
+                    moveUp = false;
+                    break;
+                case 'KeyF':
+                    moveDown = false;
+                    break;
+            }
+        }
+
+        // Handle mouse down events
+        function onMouseDown(event) {
+            // For free roam mode, handled by OrbitControls
+        }
+
+        // Handle mouse up events
+        function onMouseUp(event) {
+            // For free roam mode, handled by OrbitControls
+        }
+
+        // Handle mouse move events
+        function onMouseMove(event) {
+            // For free roam mode, handled by OrbitControls
+        }
+
+        // Handle touch start events
+        function onTouchStart(event) {
+            // Implement touch controls for mobile
+            if (event.touches.length === 1) {
+                // Single touch - move forward
+                moveForward = true;
+            } else if (event.touches.length === 2) {
+                // Two touches - handle pinch/rotate
+            }
+        }
+
+        // Handle touch end events
+        function onTouchEnd(event) {
+            // Reset movement flags
+            moveForward = false;
+            moveBackward = false;
+            moveLeft = false;
+            moveRight = false;
+            rotateLeft = false;
+            rotateRight = false;
+        }
+
+        // Handle touch move events
+        function onTouchMove(event) {
+            if (event.touches.length === 1) {
+                // Single touch - handle direction
+                const touch = event.touches[0];
+                const centerX = window.innerWidth / 2;
+                
+                if (touch.clientX < centerX - 50) {
+                    rotateLeft = true;
+                    rotateRight = false;
+                } else if (touch.clientX > centerX + 50) {
+                    rotateLeft = false;
+                    rotateRight = true;
+                } else {
+                    rotateLeft = false;
+                    rotateRight = false;
+                }
+            }
+        }
+
+        // Change weather
+        function changeWeather(weatherType) {
+            if (!weatherTypes.includes(weatherType)) return;
+            
+            currentWeather = weatherType;
+            weatherSpan.textContent = weatherType.charAt(0).toUpperCase() + weatherType.slice(1);
+            
+            // Clear existing weather particles
+            weatherParticles.forEach(particle => {
+                weatherOverlay.removeChild(particle);
+            });
+            weatherParticles = [];
+            
+            // Clear existing clouds
+            clouds.forEach(cloud => {
+                weatherOverlay.removeChild(cloud);
+            });
+            clouds = [];
+            
+            // Stop all weather sounds
+            if (rainSound) rainSound.stop();
+            if (thunderSound) thunderSound.stop();
+            if (windSound) windSound.stop();
+            
+            // Apply new weather
+            switch (weatherType) {
+                case 'clear':
+                    weatherOverlay.style.display = 'none';
+                    
+                    // Play ambient sound
+                    if (ambientSound && audioInitialized) {
+                        ambientSound.play();
+                    }
+                    break;
+                    
+                case 'rain':
+                    weatherOverlay.style.display = 'block';
+                    
+                    // Create raindrops
+                    for (let i = 0; i < 100; i++) {
+                        createRaindrop();
+                    }
+                    
+                    // Create clouds
+                    for (let i = 0; i < 5; i++) {
+                        createCloud();
+                    }
+                    
+                    // Play rain sound
+                    if (rainSound && audioInitialized) {
+                        rainSound.play();
+                    }
+                    
+                    // Occasional thunder
+                    if (Math.random() > 0.7 && thunderSound && audioInitialized) {
+                        setTimeout(() => {
+                            thunderSound.play();
+                        }, Math.random() * 10000);
+                    }
+                    break;
+                    
+                case 'cloudy':
+                    weatherOverlay.style.display = 'block';
+                    
+                    // Create clouds
+                    for (let i = 0; i < 8; i++) {
+                        createCloud();
+                    }
+                    
+                    // Play wind sound
+                    if (windSound && audioInitialized) {
+                        windSound.play();
+                    }
+                    break;
+                    
+                case 'snow':
+                    weatherOverlay.style.display = 'block';
+                    
+                    // Create snowflakes
+                    for (let i = 0; i < 50; i++) {
+                        createSnowflake();
+                    }
+                    
+                    // Create clouds
+                    for (let i = 0; i < 5; i++) {
+                        createCloud();
+                    }
+                    
+                    // Play wind sound
+                    if (windSound && audioInitialized) {
+                        windSound.play();
+                    }
+                    break;
+            }
+        }
+
+        // Create raindrop
+        function createRaindrop() {
+            const raindrop = document.createElement('div');
+            raindrop.className = 'raindrop';
+            
+            // Random position
+            const x = Math.random() * window.innerWidth;
+            const y = -20 - Math.random() * 100; // Start above viewport
+            
+            raindrop.style.left = `${x}px`;
+            raindrop.style.top = `${y}px`;
+            
+            // Add to overlay
+            weatherOverlay.appendChild(raindrop);
+            weatherParticles.push(raindrop);
+            
+            // Animate
+            const speed = 2 + Math.random() * 3;
+            
+            function animate() {
+                const currentY = parseFloat(raindrop.style.top);
+                
+                if (currentY > window.innerHeight) {
+                    // Reset position
+                    raindrop.style.left = `${Math.random() * window.innerWidth}px`;
+                    raindrop.style.top = `${-20 - Math.random() * 100}px`;
+                } else {
+                    // Move down
+                    raindrop.style.top = `${currentY + speed}px`;
+                }
+                
+                if (weatherParticles.includes(raindrop)) {
+                    requestAnimationFrame(animate);
+                }
+            }
+            
+            animate();
+        }
+
+        // Create snowflake
+        function createSnowflake() {
+            const snowflake = document.createElement('div');
+            snowflake.className = 'snowflake';
+            
+            // Random position
+            const x = Math.random() * window.innerWidth;
+            const y = -20 - Math.random() * 100; // Start above viewport
+            
+            snowflake.style.left = `${x}px`;
+            snowflake.style.top = `${y}px`;
+            
+            // Add to overlay
+            weatherOverlay.appendChild(snowflake);
+            weatherParticles.push(snowflake);
+            
+            // Animate
+            const speed = 0.5 + Math.random();
+            const wobble = Math.random() * 2 - 1;
+            let wobbleOffset = 0;
+            
+            function animate() {
+                const currentY = parseFloat(snowflake.style.top);
+                const currentX = parseFloat(snowflake.style.left);
+                
+                if (currentY > window.innerHeight) {
+                    // Reset position
+                    snowflake.style.left = `${Math.random() * window.innerWidth}px`;
+                    snowflake.style.top = `${-20 - Math.random() * 100}px`;
+                } else {
+                    // Move down with wobble
+                    wobbleOffset += 0.01;
+                    const newX = currentX + Math.sin(wobbleOffset) * wobble;
+                    
+                    snowflake.style.left = `${newX}px`;
+                    snowflake.style.top = `${currentY + speed}px`;
+                }
+                
+                if (weatherParticles.includes(snowflake)) {
+                    requestAnimationFrame(animate);
+                }
+            }
+            
+            animate();
+        }
+
+        // Create cloud
+        function createCloud() {
+            const cloud = document.createElement('div');
+            cloud.className = 'cloud';
+            
+            // Random size
+            const width = 100 + Math.random() * 200;
+            const height = 50 + Math.random() * 100;
+            
+            cloud.style.width = `${width}px`;
+            cloud.style.height = `${height}px`;
+            
+            // Random position
+            const x = Math.random() * window.innerWidth;
+            const y = Math.random() * (window.innerHeight / 2);
+            
+            cloud.style.left = `${x}px`;
+            cloud.style.top = `${y}px`;
+            
+            // Add to overlay
+            weatherOverlay.appendChild(cloud);
+            clouds.push(cloud);
+            
+            // Animate
+            const speed = 0.2 + Math.random() * 0.3;
+            
+            function animate() {
+                const currentX = parseFloat(cloud.style.left);
+                
+                if (currentX > window.innerWidth + width) {
+                    // Reset position
+                    cloud.style.left = `${-width}px`;
+                } else {
+                    // Move right
+                    cloud.style.left = `${currentX + speed}px`;
+                }
+                
+                if (clouds.includes(cloud)) {
+                    requestAnimationFrame(animate);
+                }
+            }
+            
+            animate();
+        }
+
+        // Animation loop
+        function animate() {
+            requestAnimationFrame(animate);
+            
+            const delta = clock.getDelta();
+            
+            // Update vehicle positions
+            updateVehicles(delta);
+            
+            // Handle movement in navigation mode
+            if (config.mode === 'navigation') {
+                handleNavigation(delta);
+            }
+            
+            // Handle movement in free roam mode
+            if (config.mode === 'free-roam') {
+                handleFreeRoam(delta);
+            }
+            
+            // Update coordinates display
+            if (avatar) {
+                altitudeSpan.textContent = Math.round(avatar.position.y);
+            }
+            
+            // Update orbit controls if enabled
+            if (orbitControls.enabled) {
+                orbitControls.update();
+            }
+            
+            // Render scene
+            renderer.render(scene, camera);
+        }
+
+        // Update vehicle positions
+        function updateVehicles(delta) {
+            vehicles.forEach(vehicle => {
+                if (vehicle.onMainRoad) {
+                    // Move along z-axis
+                    vehicle.mesh.position.z += vehicle.speed * vehicle.direction * delta * 60;
+                    
+                    // Check if out of bounds
+                    if (Math.abs(vehicle.mesh.position.z) > 100) {
+                        vehicle.direction *= -1;
+                        vehicle.mesh.rotation.y = vehicle.direction > 0 ? 0 : Math.PI;
+                    }
+                } else {
+                    // Move along x-axis
+                    vehicle.mesh.position.x += vehicle.speed * vehicle.direction * delta * 60;
+                    
+                    // Check if out of bounds
+                    if (Math.abs(vehicle.mesh.position.x) > 100) {
+                        vehicle.direction *= -1;
+                        vehicle.mesh.rotation.y = vehicle.direction > 0 ? Math.PI / 2 : -Math.PI / 2;
+                    }
+                }
+            });
+        }
+
+        // Handle navigation mode movement
+        function handleNavigation(delta) {
+            // Calculate movement speed
+            const speed = config.avatarSpeed[config.avatar] * delta * 60;
+            
+            // Reset velocity
+            velocity.x = 0;
+            velocity.z = 0;
+            
+            // Get avatar direction
+            direction.z = Number(moveForward) - Number(moveBackward);
+            direction.x = Number(moveRight) - Number(moveLeft);
+            direction.normalize();
+            
+            // Apply movement
+            if (moveForward || moveBackward) velocity.z -= direction.z * speed;
+            if (moveLeft || moveRight) velocity.x -= direction.x * speed;
+            
+            // Apply rotation
+            if (rotateLeft) avatar.rotation.y += config.rotationSpeed * delta * 60;
+            if (rotateRight) avatar.rotation.y -= config.rotationSpeed * delta * 60;
+            
+            // Apply vertical movement for spaceship
+            if (config.avatar === 'spaceship') {
+                if (moveUp) avatar.position.y += config.verticalSpeed * delta * 60;
+                if (moveDown) avatar.position.y -= config.verticalSpeed * delta * 60;
+                
+                // Minimum height
+                if (avatar.position.y < config.avatarHeight[config.avatar] / 2) {
+                    avatar.position.y = config.avatarHeight[config.avatar] / 2;
+                }
+            }
+            
+            // Apply movement to avatar
+            avatar.translateX(velocity.x);
+            avatar.translateZ(velocity.z);
+            
+            // Update camera position
+            updateCameraPosition();
+            
+            // Update current location based on avatar position
+            // In a real implementation, this would convert 3D world coordinates to geo coordinates
+            // For this demo, we'll use a simplified approach
+            currentLocation.lng += avatar.position.x * 0.0001;
+            currentLocation.lat += avatar.position.z * 0.0001;
+            
+            // Update map marker position
+            updateMapMarker();
+        }
+
+        // Update map marker position
+        function updateMapMarker() {
+            // Clear previous markers
+            routeLayer.clearLayers();
+            
+            // Add current position marker
+            L.marker([currentLocation.lat, currentLocation.lng]).addTo(routeLayer);
+            
+            // Add destination marker if available
+            if (destination) {
+                L.marker([destination.lat, destination.lng]).addTo(routeLayer);
+                
+                // Add route line
+                L.polyline([
+                    [currentLocation.lat, currentLocation.lng],
+                    [destination.lat, destination.lng]
+                ], {
+                    color: '#64ffda',
+                    weight: 5
+                }).addTo(routeLayer);
+            }
+            
+            // Update map center
+            map.setView([currentLocation.lat, currentLocation.lng], map.getZoom());
+        }
+
+        // Handle free roam mode movement
+        function handleFreeRoam(delta) {
+            // In free roam mode, camera movement is handled by OrbitControls
+            // We just need to handle avatar movement
+            
+            // Calculate movement speed
+            const speed = config.freeRoamSpeed[config.avatar] * delta * 60;
+            
+            // Reset velocity
+            velocity.x = 0;
+            velocity.z = 0;
+            
+            // Get movement direction from camera
+            direction.set(0, 0, -1).applyQuaternion(camera.quaternion);
+            direction.y = 0;
+            direction.normalize();
+            
+            // Calculate sideways direction
+            const sideways = new THREE.Vector3(1, 0, 0).applyQuaternion(camera.quaternion);
+            
+            // Apply movement
+            if (moveForward) {
+                velocity.x += direction.x * speed;
+                velocity.z += direction.z * speed;
+            }
+            if (moveBackward) {
+                velocity.x -= direction.x * speed;
+                velocity.z -= direction.z * speed;
+            }
+            if (moveLeft) {
+                velocity.x -= sideways.x * speed;
+                velocity.z -= sideways.z * speed;
+            }
+            if (moveRight) {
+                velocity.x += sideways.x * speed;
+                velocity.z += sideways.z * speed;
+            }
+            
+            // Apply vertical movement
+            if (moveUp) avatar.position.y += config.verticalSpeed * delta * 60;
+            if (moveDown) avatar.position.y -= config.verticalSpeed * delta * 60;
+            
+            // Minimum height
+            if (avatar.position.y < config.avatarHeight[config.avatar] / 2) {
+                avatar.position.y = config.avatarHeight[config.avatar] / 2;
+            }
+            
+            // Apply movement to avatar
+            avatar.position.x += velocity.x;
+            avatar.position.z += velocity.z;
+            
+            // Update avatar rotation to face movement direction
+            if (velocity.x !== 0 || velocity.z !== 0) {
+                avatar.lookAt(
+                    avatar.position.x + velocity.x,
+                    avatar.position.y,
+                    avatar.position.z + velocity.z
+                );
+            }
+            
+            // Update current location based on avatar position
+            currentLocation.lng += avatar.position.x * 0.0001;
+            currentLocation.lat += avatar.position.z * 0.0001;
+            
+            // Update map marker position
+            updateMapMarker();
+        }
+    </script>
 </body>
 </html>
