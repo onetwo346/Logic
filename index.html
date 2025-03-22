@@ -3,273 +3,79 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MyWorld - Advanced 3D Exploration</title>
+    <title>MyWorld - Your Personal 3D Navigation Simulation</title>
+    <link rel="stylesheet" href="styles.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-    <script defer src="https://maps.googleapis.com/maps/api/js?key=YOUR_API_KEY&libraries=places,elevation"></script>
-    <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { overflow: hidden; background: #0a192f; color: white; font-family: Arial, sans-serif; }
-        #scene-container { width: 100vw; height: 100vh; }
-        #ui { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; }
-        .panel { 
-            background: rgba(10, 25, 47, 0.9); 
-            border-radius: 8px; 
-            padding: 15px; 
-            pointer-events: auto; 
-            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5); 
-        }
-        #controls { position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); }
-        #weather-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; }
-        .raindrop { 
-            position: absolute; 
-            width: 2px; 
-            height: 20px; 
-            background: rgba(184, 213, 238, 0.7); 
-            border-radius: 0 0 5px 5px; 
-            animation: fall 0.5s linear infinite; 
-        }
-        @keyframes fall { to { transform: translateY(100vh); } }
-    </style>
+    <script defer src="https://maps.googleapis.com/maps/api/js?key=YOUR_API_KEY&libraries=places&callback=initGoogleMaps"></script>
 </head>
 <body>
-    <div id="scene-container"></div>
-    <div id="weather-overlay"></div>
-    <div id="ui">
-        <div id="controls" class="panel">
-            Controls: WASD to move | QE to rotate | RF to fly up/down | Click to teleport
+    <div id="container">
+        <div id="scene-container"></div>
+        <div id="weather-overlay"></div>
+        
+        <div id="ui-container">
+            <div id="top-panel" class="panel">
+                <div class="logo">MyWorld</div>
+                <div class="search-container">
+                    <input type="text" id="start-location" placeholder="Enter starting location">
+                    <input type="text" id="destination" placeholder="Enter destination">
+                    <button id="navigate-btn">Navigate</button>
+                </div>
+            </div>
+
+            <div id="side-panel" class="panel">
+                <div class="avatar-selection">
+                    <div class="avatar-option active" data-avatar="car">
+                        <div class="avatar-icon">🚗</div>
+                        <div>Car</div>
+                    </div>
+                    <div class="avatar-option" data-avatar="person">
+                        <div class="avatar-icon">🚶</div>
+                        <div>Person</div>
+                    </div>
+                    <div class="avatar-option" data-avatar="spaceship">
+                        <div class="avatar-icon">🚀</div>
+                        <div>Ship</div>
+                    </div>
+                </div>
+
+                <div class="mode-toggle">
+                    <div class="mode-option active" data-mode="navigation">Navigation</div>
+                    <div class="mode-option" data-mode="free-roam">Free Roam</div>
+                </div>
+            </div>
+
+            <div id="info-panel" class="panel">
+                <div class="info-item">
+                    <div class="info-icon">🕒</div>
+                    <div>ETA: <span id="eta">--:--</span></div>
+                </div>
+                <div class="info-item">
+                    <div class="info-icon">🛣️</div>
+                    <div>Distance: <span id="distance">-- km</span></div>
+                </div>
+                <div class="info-item">
+                    <div class="info-icon">🌦️</div>
+                    <div>Weather: <span id="weather">Clear</span></div>
+                </div>
+                <div class="info-item">
+                    <div class="info-icon">🚦</div>
+                    <div>Traffic: <span id="traffic">Low</span></div>
+                </div>
+            </div>
+
+            <div id="controls-hint" class="panel">
+                <div id="desktop-controls">Use W,A,S,D to move | Q,E to rotate | R,F to change altitude</div>
+                <div id="mobile-controls" class="hidden">Swipe to move | Pinch to zoom | Two-finger rotate</div>
+            </div>
+
+            <div class="progress-loader" id="loader">
+                <div class="loader"></div>
+                <div class="loading-text">Building your world...</div>
+            </div>
         </div>
     </div>
 
-    <script>
-        // Core variables
-        const scene = new THREE.Scene();
-        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-        const renderer = new THREE.WebGLRenderer({ antialias: true });
-        const clock = new THREE.Clock();
-        let avatar, ground, buildings = [];
-        const velocity = new THREE.Vector3();
-        const direction = new THREE.Vector3();
-        const rotation = new THREE.Euler(0, 0, 0, 'YXZ');
-        const raycaster = new THREE.Raycaster();
-        const mouse = new THREE.Vector2();
-        let moveForward = false, moveBackward = false, moveLeft = false, moveRight = false;
-        let moveUp = false, moveDown = false, rotateLeft = false, rotateRight = false;
-
-        // Config
-        const config = {
-            avatar: 'spaceship', // Default to spaceship for flying
-            speed: { spaceship: 1.0, car: 0.3, person: 0.1 },
-            height: { spaceship: 50, car: 1.5, person: 1.7 },
-            weather: 'clear',
-            timeOfDay: 0.5 // 0 = night, 1 = day
-        };
-
-        // Initialize
-        function init() {
-            // Renderer setup
-            renderer.setSize(window.innerWidth, window.innerHeight);
-            renderer.setPixelRatio(window.devicePixelRatio);
-            renderer.shadowMap.enabled = true;
-            document.getElementById('scene-container').appendChild(renderer.domElement);
-
-            // Scene setup
-            scene.background = new THREE.Color(0x87CEEB);
-            scene.fog = new THREE.FogExp2(0x87CEEB, 0.002);
-
-            // Lighting
-            const ambient = new THREE.AmbientLight(0xffffff, 0.3);
-            scene.add(ambient);
-            const sun = new THREE.DirectionalLight(0xffffff, 0.8);
-            sun.position.set(100, 100, 50);
-            sun.castShadow = true;
-            scene.add(sun);
-
-            // Avatar
-            const avatarGeo = new THREE.ConeGeometry(1, 3, 8);
-            const avatarMat = new THREE.MeshStandardMaterial({ color: 0xffcc00 });
-            avatar = new THREE.Mesh(avatarGeo, avatarMat);
-            avatar.position.y = config.height[config.avatar];
-            avatar.castShadow = true;
-            scene.add(avatar);
-
-            // Ground with elevation
-            initTerrain();
-
-            // Buildings
-            createBuildings();
-
-            // Camera
-            camera.position.set(0, 20, 30);
-            camera.lookAt(avatar.position);
-
-            // Events
-            window.addEventListener('resize', () => {
-                camera.aspect = window.innerWidth / window.innerHeight;
-                camera.updateProjectionMatrix();
-                renderer.setSize(window.innerWidth, window.innerHeight);
-            });
-            document.addEventListener('keydown', onKeyDown);
-            document.addEventListener('keyup', onKeyUp);
-            document.addEventListener('mousemove', onMouseMove);
-            document.addEventListener('click', onClick);
-
-            // Start
-            animate();
-            updateWeather('rain', 200); // Start with rain
-            setInterval(updateTimeOfDay, 10000); // Shift day/night
-        }
-
-        // Terrain from Google Maps Elevation
-        function initTerrain() {
-            const elevator = new google.maps.ElevationService();
-            const locations = [];
-            for (let x = -10; x <= 10; x++) {
-                for (let z = -10; z <= 10; z++) {
-                    locations.push({ lat: 37.7749 + x * 0.01, lng: -122.4194 + z * 0.01 });
-                }
-            }
-            elevator.getElevationForLocations({ locations }, (results) => {
-                const geo = new THREE.PlaneGeometry(1000, 1000, 20, 20);
-                results.forEach((result, i) => {
-                    const idx = i * 3 + 2;
-                    if (geo.attributes.position.array[idx]) {
-                        geo.attributes.position.array[idx] = result.elevation / 10;
-                    }
-                });
-                geo.computeVertexNormals();
-                const mat = new THREE.MeshStandardMaterial({ color: 0x1a472a });
-                ground = new THREE.Mesh(geo, mat);
-                ground.rotation.x = -Math.PI / 2;
-                ground.receiveShadow = true;
-                scene.add(ground);
-            });
-        }
-
-        // Procedural futuristic buildings
-        function createBuildings() {
-            for (let i = 0; i < 20; i++) {
-                const height = 10 + Math.random() * 30;
-                const geo = new THREE.BoxGeometry(5, height, 5);
-                const mat = new THREE.MeshStandardMaterial({ color: 0x666666, emissive: 0x00ffcc, emissiveIntensity: 0.2 });
-                const building = new THREE.Mesh(geo, mat);
-                building.position.set(
-                    (Math.random() - 0.5) * 800,
-                    height / 2,
-                    (Math.random() - 0.5) * 800
-                );
-                building.castShadow = true;
-                buildings.push(building);
-                scene.add(building);
-            }
-        }
-
-        // Movement
-        function updateMovement(delta) {
-            velocity.x -= velocity.x * 5.0 * delta;
-            velocity.z -= velocity.z * 5.0 * delta;
-            velocity.y -= velocity.y * 5.0 * delta;
-
-            direction.z = Number(moveForward) - Number(moveBackward);
-            direction.x = Number(moveRight) - Number(moveLeft);
-            direction.y = Number(moveUp) - Number(moveDown);
-            direction.normalize();
-
-            const speed = config.speed[config.avatar] * (config.weather === 'rain' ? 0.7 : 1.0);
-            velocity.x += direction.x * speed * delta;
-            velocity.z += direction.z * speed * delta;
-            velocity.y += direction.y * speed * delta;
-
-            if (rotateLeft) rotation.y += 0.03;
-            if (rotateRight) rotation.y -= 0.03;
-
-            avatar.position.add(velocity);
-            avatar.rotation.setFromEuler(rotation);
-
-            // Keep above ground
-            avatar.position.y = Math.max(avatar.position.y, config.height[config.avatar]);
-            camera.position.copy(avatar.position).add(new THREE.Vector3(0, 10, 20).applyQuaternion(avatar.quaternion));
-            camera.lookAt(avatar.position);
-        }
-
-        // Weather
-        function updateWeather(type, intensity) {
-            config.weather = type;
-            const overlay = document.getElementById('weather-overlay');
-            overlay.innerHTML = '';
-            if (type === 'rain') {
-                for (let i = 0; i < intensity; i++) {
-                    const drop = document.createElement('div');
-                    drop.className = 'raindrop';
-                    drop.style.left = Math.random() * 100 + '%';
-                    drop.style.animationDelay = Math.random() * 0.5 + 's';
-                    overlay.appendChild(drop);
-                }
-                scene.fog.density = 0.003;
-            } else {
-                scene.fog.density = type === 'fog' ? 0.01 : 0.002;
-            }
-        }
-
-        // Day/Night
-        function updateTimeOfDay() {
-            config.timeOfDay = (config.timeOfDay + 0.1) % 1.0;
-            const sun = scene.getObjectByProperty('type', 'DirectionalLight');
-            sun.intensity = 0.3 + 0.5 * config.timeOfDay;
-            scene.background = new THREE.Color().lerpColors(
-                new THREE.Color(0x0a192f),
-                new THREE.Color(0x87CEEB),
-                config.timeOfDay
-            );
-        }
-
-        // Input
-        function onKeyDown(event) {
-            switch (event.key.toLowerCase()) {
-                case 'w': moveForward = true; break;
-                case 's': moveBackward = true; break;
-                case 'a': moveLeft = true; break;
-                case 'd': moveRight = true; break;
-                case 'r': moveUp = true; break;
-                case 'f': moveDown = true; break;
-                case 'q': rotateLeft = true; break;
-                case 'e': rotateRight = true; break;
-            }
-        }
-        function onKeyUp(event) {
-            switch (event.key.toLowerCase()) {
-                case 'w': moveForward = false; break;
-                case 's': moveBackward = false; break;
-                case 'a': moveLeft = false; break;
-                case 'd': moveRight = false; break;
-                case 'r': moveUp = false; break;
-                case 'f': moveDown = false; break;
-                case 'q': rotateLeft = false; break;
-                case 'e': rotateRight = false; break;
-            }
-        }
-        function onMouseMove(event) {
-            mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
-            mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
-        }
-        function onClick() {
-            raycaster.setFromCamera(mouse, camera);
-            const intersects = raycaster.intersectObject(ground);
-            if (intersects.length > 0) {
-                avatar.position.copy(intersects[0].point);
-                avatar.position.y += config.height[config.avatar];
-            }
-        }
-
-        // Animation
-        function animate() {
-            requestAnimationFrame(animate);
-            const delta = clock.getDelta();
-            updateMovement(delta);
-            renderer.render(scene, camera);
-        }
-
-        // Start
-        init();
-    </script>
+    <script src="script.js"></script>
 </body>
 </html>
